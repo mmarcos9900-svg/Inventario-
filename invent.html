@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario de Carcasas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        .modal-container {
+            transition: transform 0.3s ease;
+        }
+        /* Animación para el botón de voz cuando está escuchando */
+        .voice-btn.listening svg {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Gestor de Inventario de Carcasas</h1>
+            <p class="text-gray-600 mt-2">Busca, agrega, edita o elimina dispositivos de tu inventario.</p>
+        </header>
+
+        <main>
+            <!-- Controles: Búsqueda y Botón para agregar -->
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 max-w-4xl mx-auto gap-4">
+                 <!-- Contenedor del campo de búsqueda con botón de voz -->
+                <div class="relative w-full sm:w-2/3">
+                    <input type="text" id="searchInput"
+                        class="w-full px-5 py-3 pr-12 bg-white border-2 border-gray-300 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300"
+                        placeholder="Buscar por modelo (ej: 14 PRO MAX...)">
+                    <button id="voiceSearchBtn" class="voice-btn absolute inset-y-0 right-0 flex items-center pr-4 text-gray-500 hover:text-blue-600 transition duration-300 hidden">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M7 4a3 3 0 016 0v6a3 3 0 11-6 0V4zM13 10V4a1 1 0 10-2 0v6a1 1 0 102 0zM4 10a1 1 0 011 1v1a4 4 0 008 0v-1a1 1 0 112 0v1a6 6 0 01-5 5.91V19a1 1 0 11-2 0v-2.09A6 6 0 014 12v-1a1 1 0 011-1z"></path>
+                        </svg>
+                    </button>
+                </div>
+                <button id="addDeviceBtn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+                    + Agregar Dispositivo
+                </button>
+            </div>
+
+            <!-- Tabla de Inventario -->
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl mx-auto">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modelo</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Negro</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Azul</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Rojo/Negro</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Verde</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Rojo Completo</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTable" class="bg-white divide-y divide-gray-200">
+                            <!-- Filas insertadas por JavaScript -->
+                        </tbody>
+                         <tfoot id="noResults" class="hidden">
+                            <tr>
+                                <td colspan="8" class="text-center py-10 px-6 text-gray-500">
+                                    <p class="font-semibold text-lg">No se encontraron resultados</p>
+                                    <p class="text-sm">Intenta con otro término de búsqueda o agrega un nuevo dispositivo.</p>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para Agregar/Editar Dispositivo -->
+    <div id="deviceModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-overlay hidden opacity-0">
+        <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-lg mx-4 modal-container transform scale-95">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-gray-800">Agregar Nuevo Dispositivo</h2>
+            <form id="deviceForm">
+                <input type="hidden" id="originalModel" value="">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="brand" class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                        <select id="brand" name="brand" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="iPhone">iPhone</option>
+                            <option value="Android">Android</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="model" class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                        <input type="text" id="model" name="model" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: 15 PRO MAX">
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Stock por Color:</p>
+                    <div id="stockInputs" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Inputs de stock generados por JavaScript -->
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-4">
+                    <button type="button" id="cancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // Datos CSV iniciales
+            const iphoneCsvData = `MODELO,NEGRO,AZUL,ROJO/NEGRO,VERDE,ROJO COMPLETO
+14PRO,2,,,
+14PLUS,1,,,
+11PRO MAX,3,,1,,
+14PRO MAX,5,2,,,,
+11PRO  ,1,,,,
+15PRO,5,,,,
+13PRO MAX,3,3,3,,
+12MINI,2,,,,
+15,4,,,,
+12PRO MAX,6,2,5,,5
+XR,1,,,,
+12PRO/NORMAL,8,7,7,2,1
+13PRO   ,6,9,1,,
+13NORMAL,4,6,1,,
+15PLUS,5,,,,
+15PRO MAX,8,,,,
+11NORMAL,3,6,,3,1`;
+
+            const androidCsvData = `MODELO,NEGRO,AZUL,ROJO/NEGRO,VERDE
+S23 PLUS,3,,,
+S21 PLUS,2,,1,
+A12 5G,2,,,
+A32 4G,2,3,1,
+S23 UTRA,10,5,4,
+A73,4,,,
+A54 5G,1,,,
+A71,2,1,,
+A21 S,1,,,
+A53 5G,6,,,
+A31,3,1,,
+A52/S,4,,,
+A34 5G,2,,,
+S23,1,,,
+S22 PLUS,4,1,1,
+A33 5G,1,,,
+S22 ULTRA,4,3,,2
+S20,1,1,,
+S20 FE,,1,3,
+A72,2,3,,
+S22,3,4,2,
+S21 FE,5,2,4,
+NOTE10 PLUS,2,,,
+NOTE 10 NORMAL,3,,,
+NOTE20 ULTRA,1,1,,
+S21 ULTRA,,2,1,1
+S20 ULTRA ,2,2,,
+S24 ULTRA,3,,,
+A22 4G,1,,,
+A32 5G,3,3,3,`;
+
+            const ALL_COLORS = ['NEGRO', 'AZUL', 'ROJO/NEGRO', 'VERDE', 'ROJO COMPLETO'];
+            let fullInventory = [];
+            const LOCAL_STORAGE_KEY = 'carcasasInventory';
+
+            // Elementos del DOM
+            const tableBody = document.getElementById('inventoryTable');
+            const searchInput = document.getElementById('searchInput');
+            const voiceSearchBtn = document.getElementById('voiceSearchBtn');
+            const noResultsFooter = document.getElementById('noResults');
+            const modal = document.getElementById('deviceModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const deviceForm = document.getElementById('deviceForm');
+            const addDeviceBtn = document.getElementById('addDeviceBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const stockInputsContainer = document.getElementById('stockInputs');
+
+            // --- Lógica de Datos (Inicialización y Local Storage) ---
+
+            function parseCSV(csvText, brand) {
+                const lines = csvText.trim().split('\n');
+                const headerLine = lines.shift().trim();
+                const headers = headerLine.split(',').map(h => h.trim().toUpperCase());
+
+                return lines.map(line => {
+                    const values = line.split(',');
+                    const item = {
+                        brand: brand,
+                        model: values[0].trim().toUpperCase(),
+                        stock: {}
+                    };
+                    ALL_COLORS.forEach(color => {
+                        item.stock[color] = 0;
+                    });
+                    headers.slice(1).forEach((header, index) => {
+                        const stockValue = parseInt(values[index + 1], 10) || 0;
+                        if (ALL_COLORS.includes(header)) {
+                            item.stock[header] = stockValue;
+                        }
+                    });
+                    return item;
+                });
+            }
+            
+            function saveInventory() {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fullInventory));
+                handleSearch(); // Refresca la tabla para mostrar los cambios
+            }
+
+            function initializeInventory() {
+                const storedInventory = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (storedInventory && storedInventory !== '[]') {
+                    fullInventory = JSON.parse(storedInventory);
+                } else {
+                    const iphoneInventory = parseCSV(iphoneCsvData, 'iPhone');
+                    const androidInventory = parseCSV(androidCsvData, 'Android');
+                    fullInventory = [...iphoneInventory, ...androidInventory];
+                    saveInventory();
+                }
+                renderTable(fullInventory);
+            }
+
+
+            // --- Lógica de Renderizado ---
+            
+            function renderTable(inventoryData) {
+                tableBody.innerHTML = '';
+                noResultsFooter.classList.toggle('hidden', inventoryData.length > 0);
+
+                inventoryData.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 transition-colors duration-200';
+                    const brandColor = item.brand === 'iPhone' ? 'text-blue-600' : 'text-green-600';
+
+                    let cells = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${brandColor}">${item.brand}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.model}</td>
+                    `;
+                    
+                    ALL_COLORS.forEach(color => {
+                        const stockCount = item.stock[color] || 0;
+                        const stockColor = stockCount === 0 ? 'text-red-500 font-semibold' : 'text-gray-700';
+                        cells += `<td class="px-6 py-4 whitespace-nowrap text-sm text-center ${stockColor}">${stockCount > 0 ? stockCount : '-'}</td>`;
+                    });
+
+                    cells += `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center font-medium">
+                            <button class="edit-btn text-indigo-600 hover:text-indigo-900" data-model="${item.model}">Editar</button>
+                            <button class="delete-btn text-red-600 hover:text-red-900 ml-4" data-model="${item.model}">Eliminar</button>
+                        </td>
+                    `;
+                    row.innerHTML = cells;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // --- Lógica del Modal ---
+
+            function showModal(item = null) {
+                deviceForm.reset();
+                stockInputsContainer.innerHTML = '';
+                ALL_COLORS.forEach(color => {
+                    const colorId = color.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    stockInputsContainer.innerHTML += `
+                        <div>
+                            <label for="stock-${colorId}" class="block text-xs font-medium text-gray-600">${color}</label>
+                            <input type="number" id="stock-${colorId}" name="${color}" min="0" value="0" class="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm text-center focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    `;
+                });
+
+                if (item) {
+                    modalTitle.textContent = 'Editar Dispositivo';
+                    document.getElementById('originalModel').value = item.model;
+                    document.getElementById('brand').value = item.brand;
+                    document.getElementById('model').value = item.model;
+                    document.getElementById('model').readOnly = true;
+                    
+                    ALL_COLORS.forEach(color => {
+                        const colorId = color.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        document.getElementById(`stock-${colorId}`).value = item.stock[color] || 0;
+                    });
+
+                } else {
+                    modalTitle.textContent = 'Agregar Nuevo Dispositivo';
+                    document.getElementById('originalModel').value = '';
+                    document.getElementById('model').readOnly = false;
+                }
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.querySelector('.modal-container').classList.remove('scale-95');
+                }, 10);
+            }
+
+            function hideModal() {
+                 modal.classList.add('opacity-0');
+                 modal.querySelector('.modal-container').classList.add('scale-95');
+                 setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+
+            // --- Lógica de Búsqueda por Voz ---
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'es-ES'; // Set language to Spanish
+                recognition.continuous = false;
+
+                voiceSearchBtn.classList.remove('hidden');
+
+                voiceSearchBtn.addEventListener('click', () => {
+                    recognition.start();
+                });
+
+                recognition.addEventListener('start', () => {
+                    voiceSearchBtn.classList.add('listening', 'text-red-500');
+                });
+
+                recognition.addEventListener('end', () => {
+                    voiceSearchBtn.classList.remove('listening', 'text-red-500');
+                });
+                
+                recognition.addEventListener('result', (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    searchInput.value = transcript;
+                    handleSearch(); // Trigger search with the transcript
+                });
+
+                recognition.addEventListener('error', (event) => {
+                    console.error('Error en el reconocimiento de voz:', event.error);
+                    alert(`Error en el reconocimiento de voz: ${event.error}`);
+                });
+
+            } else {
+                console.warn('La API de reconocimiento de voz no es compatible con este navegador.');
+            }
+
+
+            // --- Manejadores de Eventos ---
+
+            function handleSearch() {
+                const searchTerm = searchInput.value.trim().toUpperCase();
+                const filteredInventory = fullInventory.filter(item =>
+                    item.model.includes(searchTerm)
+                );
+                renderTable(filteredInventory);
+            }
+
+            function handleFormSubmit(event) {
+                event.preventDefault();
+                const originalModel = document.getElementById('originalModel').value.trim().toUpperCase();
+                const newModel = document.getElementById('model').value.trim().toUpperCase();
+
+                if (!newModel) {
+                    alert('El nombre del modelo no puede estar vacío.');
+                    return;
+                }
+                
+                if (!originalModel && fullInventory.some(item => item.model === newModel)) {
+                    alert('Ya existe un dispositivo con este modelo. Por favor, edítalo o elige otro nombre.');
+                    return;
+                }
+                
+                const formData = new FormData(deviceForm);
+                const stock = {};
+                ALL_COLORS.forEach(color => {
+                    stock[color] = parseInt(formData.get(color), 10) || 0;
+                });
+                
+                const deviceData = {
+                    brand: formData.get('brand'),
+                    model: newModel,
+                    stock: stock,
+                };
+
+                if (originalModel) { // Editando
+                    const index = fullInventory.findIndex(item => item.model === originalModel);
+                    if (index !== -1) {
+                        fullInventory[index] = deviceData;
+                    }
+                } else { // Agregando
+                    fullInventory.push(deviceData);
+                }
+                
+                saveInventory();
+                hideModal();
+            }
+
+            function handleTableClick(event) {
+                const target = event.target;
+                const model = target.dataset.model;
+
+                if (target.classList.contains('edit-btn')) {
+                    const item = fullInventory.find(d => d.model === model);
+                    if (item) showModal(item);
+                }
+
+                if (target.classList.contains('delete-btn')) {
+                    const confirmation = prompt(`Escribe 'ELIMINAR' para borrar el modelo ${model}. Esta acción no se puede deshacer.`);
+                    if (confirmation === 'ELIMINAR') {
+                        fullInventory = fullInventory.filter(d => d.model !== model);
+                        saveInventory();
+                    } else if (confirmation !== null) {
+                        alert('La palabra de confirmación es incorrecta. No se ha eliminado el dispositivo.');
+                    }
+                }
+            }
+
+
+            // --- Asignación de Eventos ---
+
+            searchInput.addEventListener('input', handleSearch);
+            addDeviceBtn.addEventListener('click', () => showModal());
+            cancelBtn.addEventListener('click', hideModal);
+            deviceForm.addEventListener('submit', handleFormSubmit);
+            tableBody.addEventListener('click', handleTableClick);
+
+            // Iniciar la aplicación
+            initializeInventory();
+        });
+    </script>
+</body>
+</html>
